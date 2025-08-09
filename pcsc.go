@@ -19,10 +19,10 @@ type PCSC struct {
 	ClientInfo *subspacerelaypb.ClientInfo
 }
 
-func NewPCSC(ctx context.Context, serverURL, relayID string, connTypes ...subspacerelaypb.ConnectionType) (_ *PCSC, err error) {
+func NewPCSC(ctx context.Context, brokerURL, relayID string, connTypes ...subspacerelaypb.ConnectionType) (_ *PCSC, err error) {
 	defer DeferWrap(&err)
 
-	relay, err := New(ctx, serverURL, relayID)
+	relay, err := New(ctx, brokerURL, relayID)
 	if err != nil {
 		return
 	}

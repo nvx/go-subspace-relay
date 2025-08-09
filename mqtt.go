@@ -100,10 +100,10 @@ func (r *SubspaceRelay) RegisterHandler(h Handler) {
 // New returns a new SubspaceRelay instance
 // relayID must be "" if this end is the relay, otherwise if this is the controlling end provide the relayID of the
 // other side which is randomly generated on startup and can be read from SubspaceRelay.RelayID
-func New(ctx context.Context, serverURL, relayID string) (_ *SubspaceRelay, err error) {
+func New(ctx context.Context, brokerURL, relayID string) (_ *SubspaceRelay, err error) {
 	defer DeferWrap(&err)
 
-	u, err := url.Parse(serverURL)
+	u, err := url.Parse(brokerURL)
 	if err != nil {
 		return
 	}
