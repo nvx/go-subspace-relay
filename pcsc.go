@@ -92,7 +92,7 @@ func (p *PCSC) ATR() ([]byte, error) {
 	return p.ClientInfo.Atr, nil
 }
 
-func (p *PCSC) Reconnect() error {
+func (p *PCSC) Reconnect(ctx context.Context) error {
 	// TODO: Could add this
 	return errors.New("unsupported")
 }
