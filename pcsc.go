@@ -2,14 +2,12 @@ package subspacerelay
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"github.com/eclipse/paho.golang/paho"
 	subspacerelaypb "github.com/nvx/subspace-relay"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"log/slog"
 	"slices"
-	"strings"
 )
 
 // PCSC allows communicating with a remote PCSC-like connected reader
@@ -44,8 +42,7 @@ func NewPCSC(ctx context.Context, brokerURL, relayID string, connTypes ...subspa
 	switch msg := msg.Message.(type) {
 	case *subspacerelaypb.Message_ClientInfo:
 		p.ClientInfo = msg.ClientInfo
-		slog.InfoContext(ctx, "Got client info", slog.String("connection_type", p.ClientInfo.ConnectionType.String()),
-			slog.String("device_name", p.ClientInfo.DeviceName), slog.String("atr", strings.ToUpper(hex.EncodeToString(p.ClientInfo.Atr))))
+		slog.InfoContext(ctx, "Got client info", ClientInfoAttrs(p.ClientInfo))
 		if len(connTypes) != 0 && !slices.Contains(connTypes, p.ClientInfo.ConnectionType) {
 			err = errors.New("client type mismatch")
 			break

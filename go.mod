@@ -1,12 +1,12 @@
 module github.com/nvx/go-subspace-relay
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/ansel1/merry/v2 v2.2.2
 	github.com/eclipse/paho.golang v0.23.0
 	github.com/google/uuid v1.6.0
-	github.com/nvx/subspace-relay v0.0.1
+	github.com/nvx/subspace-relay v0.0.3
 	github.com/thessem/zap-prettyconsole v0.5.2
 	go.uber.org/zap v1.27.0
 	go.uber.org/zap/exp v0.3.0

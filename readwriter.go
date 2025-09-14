@@ -59,7 +59,7 @@ func (rw *readWriter) checkClient(ctx context.Context) (err error) {
 
 	switch msg := msg.Message.(type) {
 	case *subspacerelaypb.Message_ClientInfo:
-		slog.InfoContext(ctx, "Got client info", slog.String("connection_type", msg.ClientInfo.ConnectionType.String()), slog.Any("supported_payload_types", msg.ClientInfo.SupportedPayloadTypes))
+		slog.InfoContext(ctx, "Got client info", ClientInfoAttrs(msg.ClientInfo))
 		if msg.ClientInfo.ConnectionType != subspacerelaypb.ConnectionType_CONNECTION_TYPE_NFC ||
 			!slices.Contains(msg.ClientInfo.SupportedPayloadTypes, subspacerelaypb.PayloadType_PAYLOAD_TYPE_CARDHOPPER) {
 			err = errors.New("client type mismatch")
