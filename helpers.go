@@ -44,14 +44,20 @@ func (r *SubspaceRelay) ExchangePayloadBytes(ctx context.Context, payload *subsp
 func (r *SubspaceRelay) ExchangePayload(ctx context.Context, payload *subspacerelaypb.Payload) (_ *subspacerelaypb.Payload, err error) {
 	defer DeferWrap(&err)
 
-	reply, err := r.Exchange(ctx, &subspacerelaypb.Message{Message: &subspacerelaypb.Message_Payload{Payload: payload}})
+	return r.ExchangeMessageForPayload(ctx, &subspacerelaypb.Message{Message: &subspacerelaypb.Message_Payload{Payload: payload}}, payload.PayloadType)
+}
+
+func (r *SubspaceRelay) ExchangeMessageForPayload(ctx context.Context, message *subspacerelaypb.Message, expectedPayloadType subspacerelaypb.PayloadType) (_ *subspacerelaypb.Payload, err error) {
+	defer DeferWrap(&err)
+
+	reply, err := r.Exchange(ctx, message)
 	if err != nil {
 		return
 	}
 
 	switch msg := reply.Message.(type) {
 	case *subspacerelaypb.Message_Payload:
-		if msg.Payload.PayloadType != payload.PayloadType {
+		if msg.Payload.PayloadType != expectedPayloadType && expectedPayloadType != subspacerelaypb.PayloadType_PAYLOAD_TYPE_UNSPECIFIED {
 			err = errors.New("unexpected payload type")
 			return
 		}
@@ -90,12 +96,12 @@ func (r *SubspaceRelay) HandlePayload(ctx context.Context, properties *paho.Publ
 		return
 	}
 
-	r.sequence++
 	responsePayload := &subspacerelaypb.Payload{
 		Payload:     response,
 		PayloadType: payload.PayloadType,
 		Sequence:    r.sequence,
 	}
+	r.sequence++
 
 	err = r.SendReply(ctx, properties, &subspacerelaypb.Message{Message: &subspacerelaypb.Message_Payload{Payload: responsePayload}})
 	if err != nil {
@@ -108,9 +114,9 @@ func (r *SubspaceRelay) HandlePayload(ctx context.Context, properties *paho.Publ
 func (r *SubspaceRelay) SendReply(ctx context.Context, properties *paho.PublishProperties, message *subspacerelaypb.Message) (err error) {
 	defer DeferWrap(&err)
 
-	if len(properties.CorrelationData) == 0 || properties.ResponseTopic == "" {
-		err = errors.New("missing response topic")
-		return
+	topic := properties.ResponseTopic
+	if topic == "" {
+		topic = r.writeTopic
 	}
 
 	reply, err := proto.Marshal(message)
@@ -122,7 +128,7 @@ func (r *SubspaceRelay) SendReply(ctx context.Context, properties *paho.PublishP
 
 	_, err = r.conn.Publish(ctx, &paho.Publish{
 		QoS:     2,
-		Topic:   properties.ResponseTopic,
+		Topic:   topic,
 		Payload: reply,
 		Properties: &paho.PublishProperties{
 			ContentType:     "application/proto",

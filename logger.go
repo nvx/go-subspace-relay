@@ -33,22 +33,22 @@ func InitLogger(name string) {
 	)))
 }
 
-func ClientInfoAttrs(clientInfo *subspacerelaypb.ClientInfo) slog.Attr {
+func RelayInfoAttrs(relayInfo *subspacerelaypb.RelayInfo) slog.Attr {
 	attrs := []slog.Attr{
-		slog.String("connection_type", clientInfo.ConnectionType.String()),
+		slog.String("connection_type", relayInfo.ConnectionType.String()),
 	}
-	if clientInfo.DeviceName != "" {
-		attrs = append(attrs, slog.String("device_name", clientInfo.DeviceName))
+	if relayInfo.DeviceName != "" {
+		attrs = append(attrs, slog.String("device_name", relayInfo.DeviceName))
 	}
-	if len(clientInfo.Atr) != 0 {
-		attrs = append(attrs, slog.String("atr", strings.ToUpper(hex.EncodeToString(clientInfo.Atr))))
+	if len(relayInfo.Atr) != 0 {
+		attrs = append(attrs, slog.String("atr", strings.ToUpper(hex.EncodeToString(relayInfo.Atr))))
 	}
-	if len(clientInfo.DeviceAddress) != 0 {
-		attrs = append(attrs, slog.String("device_address", strings.ToUpper(hex.EncodeToString(clientInfo.DeviceAddress))))
+	if len(relayInfo.DeviceAddress) != 0 {
+		attrs = append(attrs, slog.String("device_address", strings.ToUpper(hex.EncodeToString(relayInfo.DeviceAddress))))
 	}
-	if clientInfo.Rssi != 0 {
-		attrs = append(attrs, slog.Int("rssi", int(clientInfo.Rssi)))
+	if relayInfo.Rssi != 0 {
+		attrs = append(attrs, slog.Int("rssi", int(relayInfo.Rssi)))
 	}
 
-	return slog.GroupAttrs("client_info", attrs...)
+	return slog.GroupAttrs("relay_info", attrs...)
 }

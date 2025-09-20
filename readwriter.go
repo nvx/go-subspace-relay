@@ -49,24 +49,24 @@ func (r *SubspaceRelay) ReadWriter(ctx context.Context, payloadType subspacerela
 }
 
 func (rw *readWriter) checkClient(ctx context.Context) (err error) {
-	slog.InfoContext(ctx, "Requesting client info")
+	slog.InfoContext(ctx, "Requesting relay info")
 	msg, err := rw.r.Exchange(ctx, &subspacerelaypb.Message{
-		Message: &subspacerelaypb.Message_RequestClientInfo{RequestClientInfo: &emptypb.Empty{}},
+		Message: &subspacerelaypb.Message_RequestRelayInfo{RequestRelayInfo: &emptypb.Empty{}},
 	})
 	if err != nil {
 		return
 	}
 
 	switch msg := msg.Message.(type) {
-	case *subspacerelaypb.Message_ClientInfo:
-		slog.InfoContext(ctx, "Got client info", ClientInfoAttrs(msg.ClientInfo))
-		if msg.ClientInfo.ConnectionType != subspacerelaypb.ConnectionType_CONNECTION_TYPE_NFC ||
-			!slices.Contains(msg.ClientInfo.SupportedPayloadTypes, subspacerelaypb.PayloadType_PAYLOAD_TYPE_CARDHOPPER) {
-			err = errors.New("client type mismatch")
+	case *subspacerelaypb.Message_RelayInfo:
+		slog.InfoContext(ctx, "Got relay info", RelayInfoAttrs(msg.RelayInfo))
+		if msg.RelayInfo.ConnectionType != subspacerelaypb.ConnectionType_CONNECTION_TYPE_NFC ||
+			!slices.Contains(msg.RelayInfo.SupportedPayloadTypes, subspacerelaypb.PayloadType_PAYLOAD_TYPE_CARDHOPPER) {
+			err = errors.New("relay type mismatch")
 			break
 		}
 	default:
-		err = errors.New("unexpected response to request client info message")
+		err = errors.New("unexpected response to request relay info message")
 	}
 	if err != nil {
 		return

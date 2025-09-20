@@ -162,6 +162,7 @@ func New(ctx context.Context, brokerURL, relayID string) (_ *SubspaceRelay, err 
 		ConnectUsername:               userInfo.Username(),
 		ConnectPassword:               passwordBytes,
 		CleanStartOnInitialConnection: true,
+		KeepAlive:                     60,
 		SessionExpiryInterval:         60,
 		ClientConfig: paho.ClientConfig{
 			ClientID:           mqttClientID + clientSuffix,

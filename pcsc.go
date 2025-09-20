@@ -14,7 +14,7 @@ import (
 type PCSC struct {
 	relay *SubspaceRelay
 
-	ClientInfo *subspacerelaypb.ClientInfo
+	RelayInfo *subspacerelaypb.RelayInfo
 }
 
 func NewPCSC(ctx context.Context, brokerURL, relayID string, connTypes ...subspacerelaypb.ConnectionType) (_ *PCSC, err error) {
@@ -30,9 +30,9 @@ func NewPCSC(ctx context.Context, brokerURL, relayID string, connTypes ...subspa
 
 	relay.RegisterHandler(p)
 
-	slog.InfoContext(ctx, "Requesting client info")
+	slog.InfoContext(ctx, "Requesting relay info")
 	msg, err := relay.Exchange(ctx, &subspacerelaypb.Message{
-		Message: &subspacerelaypb.Message_RequestClientInfo{RequestClientInfo: &emptypb.Empty{}},
+		Message: &subspacerelaypb.Message_RequestRelayInfo{RequestRelayInfo: &emptypb.Empty{}},
 	})
 	if err != nil {
 		_ = p.Close()
@@ -40,15 +40,15 @@ func NewPCSC(ctx context.Context, brokerURL, relayID string, connTypes ...subspa
 	}
 
 	switch msg := msg.Message.(type) {
-	case *subspacerelaypb.Message_ClientInfo:
-		p.ClientInfo = msg.ClientInfo
-		slog.InfoContext(ctx, "Got client info", ClientInfoAttrs(p.ClientInfo))
-		if len(connTypes) != 0 && !slices.Contains(connTypes, p.ClientInfo.ConnectionType) {
-			err = errors.New("client type mismatch")
+	case *subspacerelaypb.Message_RelayInfo:
+		p.RelayInfo = msg.RelayInfo
+		slog.InfoContext(ctx, "Got relay info", RelayInfoAttrs(p.RelayInfo))
+		if len(connTypes) != 0 && !slices.Contains(connTypes, p.RelayInfo.ConnectionType) {
+			err = errors.New("relay type mismatch")
 			break
 		}
 	default:
-		err = errors.New("unexpected response to request client info message")
+		err = errors.New("unexpected response to request relay info message")
 	}
 	if err != nil {
 		_ = p.Close()
@@ -79,14 +79,14 @@ func (p *PCSC) Control(ctx context.Context, code uint16, data []byte) ([]byte, e
 }
 
 func (p *PCSC) DeviceName() string {
-	return p.ClientInfo.DeviceName
+	return p.RelayInfo.DeviceName
 }
 
 func (p *PCSC) ATR() ([]byte, error) {
-	if p.ClientInfo.ConnectionType != subspacerelaypb.ConnectionType_CONNECTION_TYPE_PCSC {
+	if p.RelayInfo.ConnectionType != subspacerelaypb.ConnectionType_CONNECTION_TYPE_PCSC {
 		return nil, errors.New("atr not supported by connection type")
 	}
-	return p.ClientInfo.Atr, nil
+	return p.RelayInfo.Atr, nil
 }
 
 func (p *PCSC) Reconnect(ctx context.Context) error {

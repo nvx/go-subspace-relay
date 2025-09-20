@@ -11,7 +11,7 @@ import (
 
 func DeferWrap(err *error) {
 	if err != nil {
-		*err = merry.Wrap(*err)
+		*err = merry.WrapSkipping(*err, 1)
 	}
 }
 
