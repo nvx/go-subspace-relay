@@ -34,7 +34,7 @@ type SubspaceRelay struct {
 	readTopic  string
 	writeTopic string
 
-	rpcPending map[string]chan<- *paho.Publish
+	rpcPending map[string]pendingRPC
 
 	lock     sync.Mutex
 	handlers []Handler
@@ -137,7 +137,7 @@ func New(ctx context.Context, brokerURL, relayID string) (_ *SubspaceRelay, err 
 		isRelaySide: isRelaySide,
 		RelayID:     relayID,
 
-		rpcPending: make(map[string]chan<- *paho.Publish),
+		rpcPending: make(map[string]pendingRPC),
 		crypto:     newCrypto(relayID),
 	}
 

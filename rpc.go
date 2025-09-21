@@ -10,7 +10,56 @@ import (
 	"io"
 )
 
+type pendingRPC struct {
+	persistent bool
+	ch         chan<- *paho.Publish
+}
+
 func (r *SubspaceRelay) Exchange(ctx context.Context, message *subspacerelaypb.Message) (_ *subspacerelaypb.Message, err error) {
+	ch, id, err := r.exchange(ctx, message, false)
+	if err != nil {
+		return
+	}
+
+	select {
+	case <-ctx.Done():
+		r.deletePendingRPC(id)
+		err = context.Cause(ctx)
+		return
+	case res := <-ch:
+		return r.Parse(ctx, res)
+	}
+}
+
+func (r *SubspaceRelay) ExchangeMulti(ctx context.Context, message *subspacerelaypb.Message, cb func(context.Context, *subspacerelaypb.Message) (final bool, err error)) (err error) {
+	ch, id, err := r.exchange(ctx, message, true)
+	if err != nil {
+		return
+	}
+	defer r.deletePendingRPC(id)
+
+	for {
+		select {
+		case <-ctx.Done():
+			err = context.Cause(ctx)
+			return
+		case res := <-ch:
+			var m *subspacerelaypb.Message
+			m, err = r.Parse(ctx, res)
+			if err != nil {
+				return
+			}
+
+			var final bool
+			final, err = cb(ctx, m)
+			if err != nil || final {
+				return
+			}
+		}
+	}
+}
+
+func (r *SubspaceRelay) exchange(ctx context.Context, message *subspacerelaypb.Message, persistent bool) (_ <-chan *paho.Publish, _ []byte, err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
 	messageBytes, err := proto.Marshal(message)
@@ -20,7 +69,7 @@ func (r *SubspaceRelay) Exchange(ctx context.Context, message *subspacerelaypb.M
 
 	messageBytes = r.crypto.encrypt(messageBytes)
 
-	ch, id := r.addPendingRPC()
+	ch, id := r.addPendingRPC(persistent)
 
 	pb := &paho.Publish{
 		QoS:     2,
@@ -36,25 +85,22 @@ func (r *SubspaceRelay) Exchange(ctx context.Context, message *subspacerelaypb.M
 
 	_, err = r.conn.Publish(ctx, pb)
 	if err != nil {
-		r.getPendingRPC(id)
+		r.deletePendingRPC(id)
 		return
 	}
 
-	select {
-	case <-ctx.Done():
-		r.getPendingRPC(id)
-		err = context.Cause(ctx)
-		return
-	case res := <-ch:
-		return r.Parse(ctx, res)
-	}
+	return ch, id, nil
 }
 
-func (r *SubspaceRelay) addPendingRPC() (<-chan *paho.Publish, []byte) {
+func (r *SubspaceRelay) addPendingRPC(persistent bool) (<-chan *paho.Publish, []byte) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	ch := make(chan *paho.Publish, 1)
+	l := 1
+	if persistent {
+		l = 10
+	}
+	ch := make(chan *paho.Publish, l)
 
 	id := make([]byte, 16)
 	_, err := io.ReadFull(rand.Reader, id)
@@ -62,21 +108,35 @@ func (r *SubspaceRelay) addPendingRPC() (<-chan *paho.Publish, []byte) {
 		panic(err)
 	}
 
-	r.rpcPending[string(id)] = ch
+	r.rpcPending[string(id)] = pendingRPC{
+		persistent: persistent,
+		ch:         ch,
+	}
 
 	return ch, id
 }
 
-func (r *SubspaceRelay) getPendingRPC(id []byte) chan<- *paho.Publish {
+func (r *SubspaceRelay) deletePendingRPC(id []byte) {
+	s := string(id)
+
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
+	delete(r.rpcPending, s)
+}
+
+func (r *SubspaceRelay) getPendingRPC(id []byte) chan<- *paho.Publish {
 	s := string(id)
 
-	ch := r.rpcPending[s]
-	delete(r.rpcPending, s)
+	r.lock.Lock()
+	defer r.lock.Unlock()
 
-	return ch
+	pending := r.rpcPending[s]
+	if !pending.persistent {
+		delete(r.rpcPending, s)
+	}
+
+	return pending.ch
 }
 
 func (r *SubspaceRelay) rpcHandleReply(pb *paho.Publish) bool {
