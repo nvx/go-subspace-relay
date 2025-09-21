@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"github.com/eclipse/paho.golang/paho"
+	"github.com/nvx/go-rfid"
 	subspacerelaypb "github.com/nvx/subspace-relay"
 	"google.golang.org/protobuf/proto"
 )
 
 func (r *SubspaceRelay) Parse(ctx context.Context, p *paho.Publish) (_ *subspacerelaypb.Message, err error) {
-	defer DeferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	if p.Properties == nil || p.Properties.ContentType != "application/proto" {
 		err = errors.New("unexpected content-type")
@@ -31,7 +32,7 @@ func (r *SubspaceRelay) Parse(ctx context.Context, p *paho.Publish) (_ *subspace
 }
 
 func (r *SubspaceRelay) ExchangePayloadBytes(ctx context.Context, payload *subspacerelaypb.Payload) (_ []byte, err error) {
-	defer DeferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	p, err := r.ExchangePayload(ctx, payload)
 	if err != nil {
@@ -42,13 +43,13 @@ func (r *SubspaceRelay) ExchangePayloadBytes(ctx context.Context, payload *subsp
 }
 
 func (r *SubspaceRelay) ExchangePayload(ctx context.Context, payload *subspacerelaypb.Payload) (_ *subspacerelaypb.Payload, err error) {
-	defer DeferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	return r.ExchangeMessageForPayload(ctx, &subspacerelaypb.Message{Message: &subspacerelaypb.Message_Payload{Payload: payload}}, payload.PayloadType)
 }
 
 func (r *SubspaceRelay) ExchangeMessageForPayload(ctx context.Context, message *subspacerelaypb.Message, expectedPayloadType subspacerelaypb.PayloadType) (_ *subspacerelaypb.Payload, err error) {
-	defer DeferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	reply, err := r.Exchange(ctx, message)
 	if err != nil {
@@ -70,7 +71,7 @@ func (r *SubspaceRelay) ExchangeMessageForPayload(ctx context.Context, message *
 
 func (r *SubspaceRelay) HandlePayload(ctx context.Context, properties *paho.PublishProperties, payload *subspacerelaypb.Payload,
 	handler func(context.Context, *subspacerelaypb.Payload) ([]byte, error), supportedPayloadTypes ...subspacerelaypb.PayloadType) (err error) {
-	defer DeferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	if len(supportedPayloadTypes) > 0 {
 		var found bool
@@ -112,7 +113,7 @@ func (r *SubspaceRelay) HandlePayload(ctx context.Context, properties *paho.Publ
 }
 
 func (r *SubspaceRelay) SendReply(ctx context.Context, properties *paho.PublishProperties, message *subspacerelaypb.Message) (err error) {
-	defer DeferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	topic := properties.ResponseTopic
 	if topic == "" {
@@ -143,7 +144,7 @@ func (r *SubspaceRelay) SendReply(ctx context.Context, properties *paho.PublishP
 }
 
 func (r *SubspaceRelay) SendUnsolicited(ctx context.Context, message *subspacerelaypb.Message) (err error) {
-	defer DeferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	reply, err := proto.Marshal(message)
 	if err != nil {
@@ -168,7 +169,7 @@ func (r *SubspaceRelay) SendUnsolicited(ctx context.Context, message *subspacere
 }
 
 func (r *SubspaceRelay) SendLog(ctx context.Context, log *subspacerelaypb.Log) (err error) {
-	defer DeferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	return r.SendUnsolicited(ctx, &subspacerelaypb.Message{Message: &subspacerelaypb.Message_Log{Log: log}})
 }

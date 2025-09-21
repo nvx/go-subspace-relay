@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/eclipse/paho.golang/paho"
+	"github.com/nvx/go-rfid"
 	subspacerelaypb "github.com/nvx/subspace-relay"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"log/slog"
@@ -18,7 +19,7 @@ type PCSC struct {
 }
 
 func NewPCSC(ctx context.Context, brokerURL, relayID string, connTypes ...subspacerelaypb.ConnectionType) (_ *PCSC, err error) {
-	defer DeferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	relay, err := New(ctx, brokerURL, relayID)
 	if err != nil {
@@ -102,7 +103,7 @@ func (p *PCSC) HandleMQTT(ctx context.Context, r *SubspaceRelay, pub *paho.Publi
 
 	req, err := p.relay.Parse(ctx, pub)
 	if err != nil {
-		slog.ErrorContext(ctx, "Error parsing unsolicited message", ErrorAttrs(err))
+		slog.ErrorContext(ctx, "Error parsing unsolicited message", rfid.ErrorAttrs(err))
 		return false
 	}
 

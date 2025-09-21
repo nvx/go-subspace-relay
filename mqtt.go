@@ -9,6 +9,7 @@ import (
 	"github.com/eclipse/paho.golang/autopaho"
 	"github.com/eclipse/paho.golang/paho"
 	"github.com/google/uuid"
+	"github.com/nvx/go-rfid"
 	"log/slog"
 	"net/url"
 	"strings"
@@ -59,7 +60,7 @@ func (r *SubspaceRelay) onPublishReceived(ctx context.Context) func(p paho.Publi
 
 func (r *SubspaceRelay) onError(ctx context.Context, msg string) func(err error) {
 	return func(err error) {
-		slog.ErrorContext(ctx, msg, ErrorAttrs(err))
+		slog.ErrorContext(ctx, msg, rfid.ErrorAttrs(err))
 	}
 }
 
@@ -82,7 +83,7 @@ func (r *SubspaceRelay) onConnectionUp(ctx context.Context) func(cm *autopaho.Co
 			},
 		}})
 		if err != nil {
-			slog.ErrorContext(ctx, "Failed to subscribe", ErrorAttrs(err))
+			slog.ErrorContext(ctx, "Failed to subscribe", rfid.ErrorAttrs(err))
 		}
 	}
 }
@@ -101,7 +102,7 @@ func (r *SubspaceRelay) RegisterHandler(h Handler) {
 // relayID must be "" if this end is the relay, otherwise if this is the controlling end provide the relayID of the
 // other side which is randomly generated on startup and can be read from SubspaceRelay.RelayID
 func New(ctx context.Context, brokerURL, relayID string) (_ *SubspaceRelay, err error) {
-	defer DeferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	u, err := url.Parse(brokerURL)
 	if err != nil {

@@ -4,13 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"github.com/eclipse/paho.golang/paho"
+	"github.com/nvx/go-rfid"
 	subspacerelaypb "github.com/nvx/subspace-relay"
 	"google.golang.org/protobuf/proto"
 	"io"
 )
 
 func (r *SubspaceRelay) Exchange(ctx context.Context, message *subspacerelaypb.Message) (_ *subspacerelaypb.Message, err error) {
-	defer DeferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	messageBytes, err := proto.Marshal(message)
 	if err != nil {

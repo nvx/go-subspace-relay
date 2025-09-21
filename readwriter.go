@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/eclipse/paho.golang/paho"
+	"github.com/nvx/go-rfid"
 	subspacerelaypb "github.com/nvx/subspace-relay"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"io"
@@ -88,7 +89,7 @@ func (rw *readWriter) HandleMQTT(ctx context.Context, r *SubspaceRelay, p *paho.
 
 	req, err := rw.r.Parse(rw.ctx, p)
 	if err != nil {
-		slog.ErrorContext(rw.ctx, "Error parsing message", ErrorAttrs(err))
+		slog.ErrorContext(rw.ctx, "Error parsing message", rfid.ErrorAttrs(err))
 		return false
 	}
 
