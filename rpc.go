@@ -72,7 +72,7 @@ func (r *SubspaceRelay) exchange(ctx context.Context, message *subspacerelaypb.M
 	ch, id := r.addPendingRPC(persistent)
 
 	pb := &paho.Publish{
-		QoS:     2,
+		QoS:     qosExactlyOnce,
 		Topic:   r.writeTopic,
 		Payload: messageBytes,
 		Properties: &paho.PublishProperties{

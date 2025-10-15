@@ -44,8 +44,13 @@ func NewPCSC(ctx context.Context, brokerURL, relayID string, connTypes ...subspa
 	case *subspacerelaypb.Message_RelayInfo:
 		p.RelayInfo = msg.RelayInfo
 		slog.InfoContext(ctx, "Got relay info", RelayInfoAttrs(p.RelayInfo))
+		if !slices.Contains(p.RelayInfo.SupportedPayloadTypes, subspacerelaypb.PayloadType_PAYLOAD_TYPE_PCSC_READER) &&
+			!slices.Contains(p.RelayInfo.SupportedPayloadTypes, subspacerelaypb.PayloadType_PAYLOAD_TYPE_PCSC_READER_CONTROL) {
+			err = errors.New("relay payload type mismatch")
+			break
+		}
 		if len(connTypes) != 0 && !slices.Contains(connTypes, p.RelayInfo.ConnectionType) {
-			err = errors.New("relay type mismatch")
+			err = errors.New("relay connection type mismatch")
 			break
 		}
 	default:
@@ -84,8 +89,8 @@ func (p *PCSC) DeviceName() string {
 }
 
 func (p *PCSC) ATR() ([]byte, error) {
-	if p.RelayInfo.ConnectionType != subspacerelaypb.ConnectionType_CONNECTION_TYPE_PCSC {
-		return nil, errors.New("atr not supported by connection type")
+	if len(p.RelayInfo.Atr) == 0 {
+		return nil, errors.New("atr not supported")
 	}
 	return p.RelayInfo.Atr, nil
 }

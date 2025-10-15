@@ -238,7 +238,6 @@ func (h *CardRelay[T]) HandleMQTT(ctx context.Context, r *SubspaceRelay, p *paho
 
 	switch msg := req.Message.(type) {
 	case *subspacerelaypb.Message_EmulationShortcut:
-
 		h.shortcutMutex.Lock()
 		h.addShortcutAlreadyHoldLock(msg.EmulationShortcut, p.Properties)
 		if msg.EmulationShortcut.Persistent {

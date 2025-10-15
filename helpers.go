@@ -12,20 +12,35 @@ import (
 func (r *SubspaceRelay) Parse(ctx context.Context, p *paho.Publish) (_ *subspacerelaypb.Message, err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
-	if p.Properties == nil || p.Properties.ContentType != "application/proto" {
+	if p.Properties == nil || p.Properties.ContentType != ContentTypeProto {
 		err = errors.New("unexpected content-type")
 		return
 	}
 
-	m, err := r.crypto.decrypt(p.Payload)
-	if err != nil {
-		return
+	m := p.Payload
+
+	if p.Topic != r.readBroadcast {
+		m, err = r.crypto.decrypt(p.Payload)
+		if err != nil {
+			return
+		}
 	}
 
 	msg := new(subspacerelaypb.Message)
 	err = proto.Unmarshal(m, msg)
 	if err != nil {
 		return
+	}
+
+	if p.Topic == r.readBroadcast {
+		switch msg.Message.(type) {
+		case *subspacerelaypb.Message_RequestRelayDiscovery,
+			*subspacerelaypb.Message_RelayDiscoveryPlaintext,
+			*subspacerelaypb.Message_RelayDiscoveryEncrypted:
+		default:
+			err = errors.New("got non-discovery message on broadcast topic")
+			return
+		}
 	}
 
 	return msg, nil
@@ -113,11 +128,24 @@ func (r *SubspaceRelay) HandlePayload(ctx context.Context, properties *paho.Publ
 }
 
 func (r *SubspaceRelay) SendReply(ctx context.Context, properties *paho.PublishProperties, message *subspacerelaypb.Message) (err error) {
+	return r.send(ctx, r.writeTopic, properties, message, r.crypto)
+}
+
+func (r *SubspaceRelay) SendBroadcast(ctx context.Context, replyProperties *paho.PublishProperties, message *subspacerelaypb.Message) (err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
-	topic := properties.ResponseTopic
-	if topic == "" {
-		topic = r.writeTopic
+	return r.send(ctx, r.writeBroadcast, replyProperties, message, nil)
+}
+
+func (r *SubspaceRelay) send(ctx context.Context, topic string, replyProperties *paho.PublishProperties, message *subspacerelaypb.Message, encrypter messageEncrypter) (err error) {
+	defer rfid.DeferWrap(ctx, &err)
+
+	var correlationData []byte
+	if replyProperties != nil {
+		correlationData = replyProperties.CorrelationData
+		if replyProperties.ResponseTopic != "" {
+			topic = replyProperties.ResponseTopic
+		}
 	}
 
 	reply, err := proto.Marshal(message)
@@ -125,15 +153,17 @@ func (r *SubspaceRelay) SendReply(ctx context.Context, properties *paho.PublishP
 		return
 	}
 
-	reply = r.crypto.encrypt(reply)
+	if encrypter != nil {
+		reply = encrypter.encrypt(reply)
+	}
 
 	_, err = r.conn.Publish(ctx, &paho.Publish{
-		QoS:     2,
+		QoS:     qosExactlyOnce,
 		Topic:   topic,
 		Payload: reply,
 		Properties: &paho.PublishProperties{
-			ContentType:     "application/proto",
-			CorrelationData: properties.CorrelationData,
+			ContentType:     ContentTypeProto,
+			CorrelationData: correlationData,
 		},
 	})
 	if err != nil {
@@ -144,28 +174,7 @@ func (r *SubspaceRelay) SendReply(ctx context.Context, properties *paho.PublishP
 }
 
 func (r *SubspaceRelay) SendUnsolicited(ctx context.Context, message *subspacerelaypb.Message) (err error) {
-	defer rfid.DeferWrap(ctx, &err)
-
-	reply, err := proto.Marshal(message)
-	if err != nil {
-		return
-	}
-
-	reply = r.crypto.encrypt(reply)
-
-	_, err = r.conn.Publish(ctx, &paho.Publish{
-		QoS:     2,
-		Topic:   r.writeTopic,
-		Payload: reply,
-		Properties: &paho.PublishProperties{
-			ContentType: ContentTypeProto,
-		},
-	})
-	if err != nil {
-		return
-	}
-
-	return nil
+	return r.SendReply(ctx, nil, message)
 }
 
 func (r *SubspaceRelay) SendLog(ctx context.Context, log *subspacerelaypb.Log) (err error) {

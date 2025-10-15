@@ -17,13 +17,26 @@ import (
 )
 
 const (
-	topicFormatToRelay   = "subspace/endpoint/%s/to-relay"
-	topicFormatFromRelay = "subspace/endpoint/%s/from-relay"
+	topicFormatToRelay           = "subspace/endpoint/%s/to-relay"
+	topicFormatFromRelay         = "subspace/endpoint/%s/from-relay"
+	topicBroadcastToRelay        = "subspace/broadcast/to-relay"
+	topicBroadcastFromRelay      = "subspace/broadcast/from-relay"
+	qosAtMostOnce           byte = 0
+	qosAtLeastOnce          byte = 1
+	qosExactlyOnce          byte = 2
 )
 
 type Handler interface {
 	HandleMQTT(ctx context.Context, r *SubspaceRelay, p *paho.Publish) bool
 }
+
+type HandlerFunc func(ctx context.Context, r *SubspaceRelay, p *paho.Publish) bool
+
+func (f HandlerFunc) HandleMQTT(ctx context.Context, r *SubspaceRelay, p *paho.Publish) bool {
+	return f(ctx, r, p)
+}
+
+var _ Handler = HandlerFunc(nil)
 
 type SubspaceRelay struct {
 	RelayID     string
@@ -31,8 +44,10 @@ type SubspaceRelay struct {
 
 	conn *autopaho.ConnectionManager
 
-	readTopic  string
-	writeTopic string
+	readTopic      string
+	writeTopic     string
+	readBroadcast  string
+	writeBroadcast string
 
 	rpcPending map[string]pendingRPC
 
@@ -81,6 +96,10 @@ func (r *SubspaceRelay) onConnectionUp(ctx context.Context) func(cm *autopaho.Co
 				Topic:   r.readTopic,
 				NoLocal: true,
 			},
+			{
+				Topic:   r.readBroadcast,
+				NoLocal: true,
+			},
 		}})
 		if err != nil {
 			slog.ErrorContext(ctx, "Failed to subscribe", rfid.ErrorAttrs(err))
@@ -123,8 +142,8 @@ func New(ctx context.Context, brokerURL, relayID string) (_ *SubspaceRelay, err 
 		relayID = uniqueID
 		isRelaySide = true
 	} else {
-		// ensure the other end has a unique client id too
-		clientSuffix = "-" + uniqueID
+		// ensure the controller side has a unique client id too
+		clientSuffix = "-controller-" + uniqueID
 	}
 
 	bID, err := pbkdf2.Key(sha256.New, relayID, []byte("mqtt-id"), 20, 16)
@@ -144,9 +163,13 @@ func New(ctx context.Context, brokerURL, relayID string) (_ *SubspaceRelay, err 
 	if isRelaySide {
 		r.readTopic = fmt.Sprintf(topicFormatToRelay, mqttClientID)
 		r.writeTopic = fmt.Sprintf(topicFormatFromRelay, mqttClientID)
+		r.readBroadcast = topicBroadcastToRelay
+		r.writeBroadcast = topicBroadcastFromRelay
 	} else {
 		r.readTopic = fmt.Sprintf(topicFormatFromRelay, mqttClientID)
 		r.writeTopic = fmt.Sprintf(topicFormatToRelay, mqttClientID)
+		r.readBroadcast = topicBroadcastFromRelay
+		r.writeBroadcast = topicBroadcastToRelay
 	}
 
 	userInfo := u.User

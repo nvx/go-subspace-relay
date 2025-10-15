@@ -65,20 +65,17 @@ func (s emulationShortcut) capduMatch(ctx context.Context, capdu apdu.Capdu) boo
 		}
 	}
 
-	if len(s.capduData) != 0 {
-		var found bool
-		for _, d := range s.capduData {
-			if bytes.Equal(d, capdu.Data) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
+	if len(s.capduData) == 0 {
+		return true
+	}
+
+	for _, d := range s.capduData {
+		if bytes.Equal(d, capdu.Data) {
+			return true
 		}
 	}
 
-	return true
+	return false
 }
 
 func (h *CardRelay[T]) tryHandleShortcut(ctx context.Context, capdu []byte) (rapdu []byte, err error) {

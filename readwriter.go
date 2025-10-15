@@ -62,7 +62,7 @@ func (rw *readWriter) checkClient(ctx context.Context) (err error) {
 	case *subspacerelaypb.Message_RelayInfo:
 		slog.InfoContext(ctx, "Got relay info", RelayInfoAttrs(msg.RelayInfo))
 		if msg.RelayInfo.ConnectionType != subspacerelaypb.ConnectionType_CONNECTION_TYPE_NFC ||
-			!slices.Contains(msg.RelayInfo.SupportedPayloadTypes, subspacerelaypb.PayloadType_PAYLOAD_TYPE_CARDHOPPER) {
+			!slices.Contains(msg.RelayInfo.SupportedPayloadTypes, rw.payloadType) {
 			err = errors.New("relay type mismatch")
 			break
 		}

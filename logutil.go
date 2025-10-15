@@ -7,8 +7,14 @@ import (
 )
 
 func RelayInfoAttrs(relayInfo *subspacerelaypb.RelayInfo) slog.Attr {
+	supportedPayloadTypes := make([]string, len(relayInfo.SupportedPayloadTypes))
+	for i := range relayInfo.SupportedPayloadTypes {
+		supportedPayloadTypes[i] = relayInfo.SupportedPayloadTypes[i].String()
+	}
+
 	attrs := []slog.Attr{
 		slog.String("connection_type", relayInfo.ConnectionType.String()),
+		slog.Any("supported_payload_types", supportedPayloadTypes),
 	}
 	if relayInfo.DeviceName != "" {
 		attrs = append(attrs, slog.String("device_name", relayInfo.DeviceName))
@@ -21,6 +27,9 @@ func RelayInfoAttrs(relayInfo *subspacerelaypb.RelayInfo) slog.Attr {
 	}
 	if relayInfo.Rssi != 0 {
 		attrs = append(attrs, slog.Int("rssi", int(relayInfo.Rssi)))
+	}
+	if relayInfo.UserAgent != "" {
+		attrs = append(attrs, slog.String("user_agent", relayInfo.UserAgent))
 	}
 
 	return slog.GroupAttrs("relay_info", attrs...)
