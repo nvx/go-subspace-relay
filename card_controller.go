@@ -14,21 +14,21 @@ import (
 
 const CardShortcutLimit = 50
 
-type CardClient struct {
+type CardController struct {
 	Relay       *SubspaceRelay
 	ctxCancel   context.CancelFunc
 	RelayInfo   *subspacerelaypb.RelayInfo
-	handler     CardClientHandler
+	handler     CardControllerHandler
 	Resequencer Resequencer
 	closeOnce   func() error
 }
 
-type CardClientHandler interface {
+type CardControllerHandler interface {
 	rfid.Exchanger
 	Disconnect(context.Context)
 }
 
-func NewCardClient(ctx context.Context, serverURL, relayID string, connTypes []subspacerelaypb.ConnectionType, handler CardClientHandler) (_ *CardClient, err error) {
+func NewCardController(ctx context.Context, serverURL, relayID string, connTypes []subspacerelaypb.ConnectionType, handler CardControllerHandler) (_ *CardController, err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
 	relay, err := New(ctx, serverURL, relayID)
@@ -38,7 +38,7 @@ func NewCardClient(ctx context.Context, serverURL, relayID string, connTypes []s
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	c := &CardClient{
+	c := &CardController{
 		Relay:       relay,
 		ctxCancel:   cancel,
 		handler:     handler,
@@ -79,7 +79,7 @@ func NewCardClient(ctx context.Context, serverURL, relayID string, connTypes []s
 
 // AddGeneralShortcut adds a non-rpc based general shortcut
 // This is mostly useful for persistent shortcuts
-func (c *CardClient) AddGeneralShortcut(ctx context.Context, msg *subspacerelaypb.EmulationShortcut) (err error) {
+func (c *CardController) AddGeneralShortcut(ctx context.Context, msg *subspacerelaypb.EmulationShortcut) (err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
 	if !isValidEmulationShortcut(msg) {
@@ -95,7 +95,7 @@ func (c *CardClient) AddGeneralShortcut(ctx context.Context, msg *subspacerelayp
 	return nil
 }
 
-func (c *CardClient) HandleMQTT(ctx context.Context, r *SubspaceRelay, p *paho.Publish) bool {
+func (c *CardController) HandleMQTT(ctx context.Context, r *SubspaceRelay, p *paho.Publish) bool {
 	req, err := r.Parse(ctx, p)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error parsing unsolicited message", rfid.ErrorAttrs(err))
@@ -146,23 +146,23 @@ func (c *CardClient) HandleMQTT(ctx context.Context, r *SubspaceRelay, p *paho.P
 	return true
 }
 
-func (c *CardClient) Reconnect(ctx context.Context, msg *subspacerelaypb.Reconnect) (err error) {
+func (c *CardController) Reconnect(ctx context.Context, msg *subspacerelaypb.Reconnect) (err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
 	return c.Relay.SendUnsolicited(ctx, &subspacerelaypb.Message{Message: &subspacerelaypb.Message_Reconnect{Reconnect: msg}})
 }
 
-func (c *CardClient) Disconnect(ctx context.Context) (err error) {
+func (c *CardController) Disconnect(ctx context.Context) (err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
 	return c.Relay.SendUnsolicited(ctx, &subspacerelaypb.Message{Message: &subspacerelaypb.Message_Disconnect{Disconnect: &emptypb.Empty{}}})
 }
 
-func (c *CardClient) Close() (err error) {
+func (c *CardController) Close() (err error) {
 	return c.closeOnce()
 }
 
-func (c *CardClient) close() (err error) {
+func (c *CardController) close() (err error) {
 	ctx := context.Background()
 	err = c.Disconnect(ctx)
 	if err != nil {

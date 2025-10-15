@@ -213,15 +213,12 @@ func (r *SubspaceRelay) SendDiscoveryResponse(ctx context.Context, replyProperti
 		return
 	}
 
-	var aead cipher.AEAD
-	var relayPubKey *ecdh.PublicKey
-	aead, relayPubKey, err = GenerateECDHAESGCM(nil, pubKey)
+	aead, relayPubKey, err := GenerateECDHAESGCM(nil, pubKey)
 	if err != nil {
 		return
 	}
 
-	var b []byte
-	b, err = proto.Marshal(relayDiscovery)
+	b, err := proto.Marshal(relayDiscovery)
 	if err != nil {
 		return
 	}
