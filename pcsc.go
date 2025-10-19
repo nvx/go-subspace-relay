@@ -13,7 +13,7 @@ import (
 
 // PCSC allows communicating with a remote PCSC-like connected reader
 type PCSC struct {
-	relay *SubspaceRelay
+	Relay *SubspaceRelay
 
 	RelayInfo *subspacerelaypb.RelayInfo
 }
@@ -26,7 +26,7 @@ func NewPCSC(ctx context.Context, brokerURL, relayID string, connTypes ...subspa
 		return
 	}
 	p := &PCSC{
-		relay: relay,
+		Relay: relay,
 	}
 
 	relay.RegisterHandler(p)
@@ -65,11 +65,11 @@ func NewPCSC(ctx context.Context, brokerURL, relayID string, connTypes ...subspa
 }
 
 func (p *PCSC) Close() (err error) {
-	return p.relay.conn.Disconnect(context.Background())
+	return p.Relay.conn.Disconnect(context.Background())
 }
 
 func (p *PCSC) Exchange(ctx context.Context, capdu []byte) ([]byte, error) {
-	return p.relay.ExchangePayloadBytes(ctx, &subspacerelaypb.Payload{
+	return p.Relay.ExchangePayloadBytes(ctx, &subspacerelaypb.Payload{
 		Payload:     capdu,
 		PayloadType: subspacerelaypb.PayloadType_PAYLOAD_TYPE_PCSC_READER,
 	})
@@ -77,7 +77,7 @@ func (p *PCSC) Exchange(ctx context.Context, capdu []byte) ([]byte, error) {
 
 func (p *PCSC) Control(ctx context.Context, code uint16, data []byte) ([]byte, error) {
 	codeUint32 := uint32(code)
-	return p.relay.ExchangePayloadBytes(ctx, &subspacerelaypb.Payload{
+	return p.Relay.ExchangePayloadBytes(ctx, &subspacerelaypb.Payload{
 		Payload:     data,
 		PayloadType: subspacerelaypb.PayloadType_PAYLOAD_TYPE_PCSC_READER_CONTROL,
 		Control:     &codeUint32,
@@ -95,6 +95,14 @@ func (p *PCSC) ATR() ([]byte, error) {
 	return p.RelayInfo.Atr, nil
 }
 
+func (p *PCSC) Disconnect(ctx context.Context) error {
+	return p.Relay.SendUnsolicited(ctx, &subspacerelaypb.Message{
+		Message: &subspacerelaypb.Message_Disconnect{
+			Disconnect: &emptypb.Empty{},
+		},
+	})
+}
+
 func (p *PCSC) Reconnect(ctx context.Context) error {
 	// TODO: Could add this
 	return errors.New("unsupported")
@@ -106,7 +114,7 @@ func (p *PCSC) HandleMQTT(ctx context.Context, r *SubspaceRelay, pub *paho.Publi
 		return false
 	}
 
-	req, err := p.relay.Parse(ctx, pub)
+	req, err := p.Relay.Parse(ctx, pub)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error parsing unsolicited message", rfid.ErrorAttrs(err))
 		return false
@@ -115,6 +123,9 @@ func (p *PCSC) HandleMQTT(ctx context.Context, r *SubspaceRelay, pub *paho.Publi
 	switch msg := req.Message.(type) {
 	case *subspacerelaypb.Message_Log:
 		slog.InfoContext(ctx, "Remote Log: "+msg.Log.Message)
+		return true
+	case *subspacerelaypb.Message_Disconnect:
+		slog.InfoContext(ctx, "Remote disconnected")
 		return true
 	default:
 		return false

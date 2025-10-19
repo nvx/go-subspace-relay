@@ -7,7 +7,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/nvx/go-apdu v1.0.1
 	github.com/nvx/go-rfid v0.0.2
-	github.com/nvx/subspace-relay v1.0.4
+	github.com/nvx/subspace-relay v1.0.7
 	golang.org/x/sync v0.17.0
 	google.golang.org/protobuf v1.36.10
 )
