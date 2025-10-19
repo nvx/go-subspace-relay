@@ -31,6 +31,18 @@ func RelayInfoAttrs(relayInfo *subspacerelaypb.RelayInfo) slog.Attr {
 	if relayInfo.UserAgent != "" {
 		attrs = append(attrs, slog.String("user_agent", relayInfo.UserAgent))
 	}
+	if len(relayInfo.Atqa) != 0 {
+		attrs = append(attrs, rfid.LogHex("atqa", relayInfo.Atqa))
+	}
+	if len(relayInfo.Sak) != 0 {
+		attrs = append(attrs, rfid.LogHex("sak", relayInfo.Sak))
+	}
+	if len(relayInfo.Uid) != 0 {
+		attrs = append(attrs, rfid.LogHex("uid", relayInfo.Uid))
+	}
+	if len(relayInfo.Ats) != 0 {
+		attrs = append(attrs, rfid.LogHex("ats", relayInfo.Ats))
+	}
 
 	return slog.GroupAttrs("relay_info", attrs...)
 }
