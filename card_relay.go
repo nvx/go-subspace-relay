@@ -64,6 +64,13 @@ func (h *CardRelay[T]) EnableDiscovery(plaintextDiscovery bool, pubKey *ecdh.Pub
 func (h *CardRelay[T]) Run(ctx context.Context) (err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
+	if h.discovery != nil && (h.pubKey != nil || h.plaintextDiscovery) {
+		err = h.relay.SendDiscoveryResponse(ctx, nil, h.discovery, h.pubKey)
+		if err != nil {
+			return
+		}
+	}
+
 	for ctx.Err() == nil {
 		err = h.relay.SendLog(context.WithoutCancel(ctx), &subspacerelaypb.Log{
 			Message: "Waiting for signal to connect",
