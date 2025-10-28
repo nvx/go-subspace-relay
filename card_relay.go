@@ -2,6 +2,7 @@ package subspacerelay
 
 import (
 	"context"
+	"crypto/ecdh"
 	"errors"
 	"github.com/eclipse/paho.golang/paho"
 	"github.com/nvx/go-rfid"
@@ -16,8 +17,11 @@ import (
 type CardRelay[T io.Closer] struct {
 	relay *SubspaceRelay
 
-	relayInfoMutex sync.RWMutex
-	relayInfo      *subspacerelaypb.RelayInfo
+	relayInfoMutex     sync.RWMutex
+	relayInfo          *subspacerelaypb.RelayInfo
+	plaintextDiscovery bool
+	pubKey             *ecdh.PublicKey
+	discovery          *subspacerelaypb.RelayDiscovery
 
 	emulateCancelMutex sync.Mutex
 	emulateCancel      context.CancelFunc
@@ -44,6 +48,16 @@ func NewCardRelay[T io.Closer](relay *SubspaceRelay, relayInfo *subspacerelaypb.
 		relayInfo:   relayInfo,
 		handler:     handler,
 		connectChan: make(chan *subspacerelaypb.Reconnect, 1),
+	}
+}
+
+func (h *CardRelay[T]) EnableDiscovery(plaintextDiscovery bool, pubKey *ecdh.PublicKey) {
+	h.plaintextDiscovery = plaintextDiscovery
+	h.pubKey = pubKey
+
+	h.discovery = &subspacerelaypb.RelayDiscovery{
+		RelayId:   h.relay.RelayID,
+		RelayInfo: h.relayInfo,
 	}
 }
 
@@ -272,6 +286,12 @@ func (h *CardRelay[T]) HandleMQTT(ctx context.Context, r *SubspaceRelay, p *paho
 		err = r.SendReply(ctx, p.Properties, &subspacerelaypb.Message{Message: &subspacerelaypb.Message_RelayInfo{
 			RelayInfo: h.relayInfo,
 		}})
+	case *subspacerelaypb.Message_Log:
+		slog.InfoContext(ctx, "Log from controller: "+msg.Log.Message)
+	case *subspacerelaypb.Message_RequestRelayDiscovery:
+		if h.discovery != nil && (h.plaintextDiscovery || h.pubKey != nil) {
+			err = r.HandleDiscoveryRequest(ctx, p.Properties, h.discovery, h.plaintextDiscovery, h.pubKey, msg.RequestRelayDiscovery)
+		}
 	default:
 		err = errors.New("unsupported message")
 	}
