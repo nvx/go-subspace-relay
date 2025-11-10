@@ -15,13 +15,13 @@ import (
 )
 
 type Discovery struct {
-	r           *SubspaceRelay
-	cancel      context.CancelFunc
-	plaintext   bool
-	key         *ecdh.PrivateKey
-	payloadType subspacerelaypb.PayloadType
-	m           sync.RWMutex
-	ch          chan *subspacerelaypb.RelayDiscovery
+	r            *SubspaceRelay
+	cancel       context.CancelFunc
+	plaintext    bool
+	key          *ecdh.PrivateKey
+	payloadTypes []subspacerelaypb.PayloadType
+	m            sync.RWMutex
+	ch           chan *subspacerelaypb.RelayDiscovery
 }
 
 type DiscoveryOption func(*Discovery)
@@ -32,9 +32,9 @@ func WithDiscoveryPrivateKey(key *ecdh.PrivateKey) DiscoveryOption {
 	}
 }
 
-func WithDiscoveryPayloadType(payloadType subspacerelaypb.PayloadType) DiscoveryOption {
+func WithDiscoveryPayloadType(payloadTypes ...subspacerelaypb.PayloadType) DiscoveryOption {
 	return func(d *Discovery) {
-		d.payloadType = payloadType
+		d.payloadTypes = payloadTypes
 	}
 }
 
@@ -73,17 +73,23 @@ func NewDiscovery(ctx context.Context, brokerURL string, opts ...DiscoveryOption
 		publicKey = d.key.PublicKey().Bytes()
 	}
 
-	err = sr.SendBroadcast(ctx, nil, &subspacerelaypb.Message{
-		Message: &subspacerelaypb.Message_RequestRelayDiscovery{
-			RequestRelayDiscovery: &subspacerelaypb.RequestRelayDiscovery{
-				ControllerPublicKey: publicKey,
-				PayloadType:         d.payloadType,
+	if len(d.payloadTypes) == 0 {
+		d.payloadTypes = []subspacerelaypb.PayloadType{subspacerelaypb.PayloadType_PAYLOAD_TYPE_UNSPECIFIED}
+	}
+
+	for _, payloadType := range d.payloadTypes {
+		err = sr.SendBroadcast(ctx, nil, &subspacerelaypb.Message{
+			Message: &subspacerelaypb.Message_RequestRelayDiscovery{
+				RequestRelayDiscovery: &subspacerelaypb.RequestRelayDiscovery{
+					ControllerPublicKey: publicKey,
+					PayloadType:         payloadType,
+				},
 			},
-		},
-	})
-	if err != nil {
-		_ = d.Close()
-		return
+		})
+		if err != nil {
+			_ = d.Close()
+			return
+		}
 	}
 
 	return d, nil
@@ -160,7 +166,10 @@ func (d *Discovery) handleMQTT(ctx context.Context, r *SubspaceRelay, p *paho.Pu
 		return false
 	}
 
-	if d.payloadType != subspacerelaypb.PayloadType_PAYLOAD_TYPE_UNSPECIFIED && !slices.Contains(relayDiscovery.RelayInfo.GetSupportedPayloadTypes(), d.payloadType) {
+	if !slices.Contains(d.payloadTypes, subspacerelaypb.PayloadType_PAYLOAD_TYPE_UNSPECIFIED) &&
+		!slices.ContainsFunc(relayDiscovery.RelayInfo.GetSupportedPayloadTypes(), func(payloadType subspacerelaypb.PayloadType) bool {
+			return slices.Contains(d.payloadTypes, payloadType)
+		}) {
 		// ignore unsupported payload type
 		return false
 	}
