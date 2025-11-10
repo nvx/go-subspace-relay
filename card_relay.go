@@ -304,6 +304,12 @@ func (h *CardRelay[T]) HandleMQTT(ctx context.Context, r *SubspaceRelay, p *paho
 	}
 	if err != nil {
 		slog.ErrorContext(ctx, "Error handling request", rfid.ErrorAttrs(err))
+
+		err = r.SendLog(ctx, &subspacerelaypb.Log{Message: "Error handling request: " + err.Error()})
+		if err != nil {
+			slog.ErrorContext(ctx, "Error sending error log", rfid.ErrorAttrs(err))
+		}
+
 		return false
 	}
 	return true
