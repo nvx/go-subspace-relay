@@ -73,23 +73,17 @@ func NewDiscovery(ctx context.Context, brokerURL string, opts ...DiscoveryOption
 		publicKey = d.key.PublicKey().Bytes()
 	}
 
-	if len(d.payloadTypes) == 0 {
-		d.payloadTypes = []subspacerelaypb.PayloadType{subspacerelaypb.PayloadType_PAYLOAD_TYPE_UNSPECIFIED}
-	}
-
-	for _, payloadType := range d.payloadTypes {
-		err = sr.SendBroadcast(ctx, nil, &subspacerelaypb.Message{
-			Message: &subspacerelaypb.Message_RequestRelayDiscovery{
-				RequestRelayDiscovery: &subspacerelaypb.RequestRelayDiscovery{
-					ControllerPublicKey: publicKey,
-					PayloadType:         payloadType,
-				},
+	err = sr.SendBroadcast(ctx, nil, &subspacerelaypb.Message{
+		Message: &subspacerelaypb.Message_RequestRelayDiscovery{
+			RequestRelayDiscovery: &subspacerelaypb.RequestRelayDiscovery{
+				ControllerPublicKey: publicKey,
+				PayloadTypes:        d.payloadTypes,
 			},
-		})
-		if err != nil {
-			_ = d.Close()
-			return
-		}
+		},
+	})
+	if err != nil {
+		_ = d.Close()
+		return
 	}
 
 	return d, nil
@@ -103,8 +97,12 @@ func (d *Discovery) Close() error {
 	d.ch = nil
 	d.m.Unlock()
 
-	close(ch)
-	return d.r.Close()
+	if ch != nil {
+		close(ch)
+		return d.r.Close()
+	}
+
+	return nil
 }
 
 func (d *Discovery) Chan() <-chan *subspacerelaypb.RelayDiscovery {
@@ -166,8 +164,8 @@ func (d *Discovery) handleMQTT(ctx context.Context, r *SubspaceRelay, p *paho.Pu
 		return false
 	}
 
-	if !slices.Contains(d.payloadTypes, subspacerelaypb.PayloadType_PAYLOAD_TYPE_UNSPECIFIED) &&
-		!slices.ContainsFunc(relayDiscovery.RelayInfo.GetSupportedPayloadTypes(), func(payloadType subspacerelaypb.PayloadType) bool {
+	if len(d.payloadTypes) > 0 &&
+		!slices.ContainsFunc(relayDiscovery.RelayInfo.SupportedPayloadTypes, func(payloadType subspacerelaypb.PayloadType) bool {
 			return slices.Contains(d.payloadTypes, payloadType)
 		}) {
 		// ignore unsupported payload type
@@ -197,7 +195,10 @@ func (r *SubspaceRelay) HandleDiscoveryRequest(ctx context.Context, replyPropert
 		return nil
 	}
 
-	if msg.PayloadType != subspacerelaypb.PayloadType_PAYLOAD_TYPE_UNSPECIFIED && !slices.Contains(relayDiscovery.RelayInfo.SupportedPayloadTypes, msg.PayloadType) {
+	if len(msg.PayloadTypes) > 0 && !slices.Contains(msg.PayloadTypes, subspacerelaypb.PayloadType_PAYLOAD_TYPE_UNSPECIFIED) &&
+		!slices.ContainsFunc(relayDiscovery.RelayInfo.SupportedPayloadTypes, func(payloadType subspacerelaypb.PayloadType) bool {
+			return slices.Contains(msg.PayloadTypes, payloadType)
+		}) {
 		// controller is looking for a relay with a different payload type
 		return nil
 	}
