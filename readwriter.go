@@ -81,7 +81,7 @@ func (rw *readWriter) Close() error {
 	return nil
 }
 
-func (rw *readWriter) HandleMQTT(ctx context.Context, r *SubspaceRelay, p *paho.Publish) bool {
+func (rw *readWriter) HandleMQTT(ctx context.Context, _ *SubspaceRelay, p *paho.Publish) bool {
 	if len(p.Properties.CorrelationData) != 0 {
 		// ignore RPC replies
 		return false

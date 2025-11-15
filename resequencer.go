@@ -8,7 +8,7 @@ import (
 type Resequencer func(ctx context.Context, sequence uint32, cb func(context.Context) error) (err error)
 
 // NoopResequencer is a dummy Resequencer that immediately calls the callback func ignoring the sequence.
-func NoopResequencer(ctx context.Context, sequence uint32, cb func(context.Context) error) (err error) {
+func NoopResequencer(ctx context.Context, _ uint32, cb func(context.Context) error) (err error) {
 	return cb(ctx)
 }
 

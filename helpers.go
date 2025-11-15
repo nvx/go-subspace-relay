@@ -7,6 +7,7 @@ import (
 	"github.com/nvx/go-rfid"
 	subspacerelaypb "github.com/nvx/subspace-relay"
 	"google.golang.org/protobuf/proto"
+	"slices"
 )
 
 func (r *SubspaceRelay) Parse(ctx context.Context, p *paho.Publish) (_ *subspacerelaypb.Message, err error) {
@@ -89,14 +90,7 @@ func (r *SubspaceRelay) HandlePayload(ctx context.Context, properties *paho.Publ
 	defer rfid.DeferWrap(ctx, &err)
 
 	if len(supportedPayloadTypes) > 0 {
-		var found bool
-		for _, t := range supportedPayloadTypes {
-			if payload.PayloadType == t {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !slices.Contains(supportedPayloadTypes, payload.PayloadType) {
 			err = errors.New("unsupported payload type: " + payload.PayloadType.String())
 			return
 		}

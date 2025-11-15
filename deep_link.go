@@ -48,7 +48,7 @@ func DeepLink(brokerURL string, mode string, discoveryPublicKey []byte) (string,
 		if u.RawQuery != "" {
 			path += "?" + u.RawQuery
 		}
-		params.Add("path", u.Path)
+		params.Add("path", path)
 	}
 	if discoveryPublicKey != nil {
 		params.Add("discovery", strings.ToUpper(hex.EncodeToString(discoveryPublicKey)))

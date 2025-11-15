@@ -103,12 +103,12 @@ func (p *PCSC) Disconnect(ctx context.Context) error {
 	})
 }
 
-func (p *PCSC) Reconnect(ctx context.Context) error {
+func (p *PCSC) Reconnect(_ context.Context) error {
 	// TODO: Could add this
 	return errors.New("unsupported")
 }
 
-func (p *PCSC) HandleMQTT(ctx context.Context, r *SubspaceRelay, pub *paho.Publish) bool {
+func (p *PCSC) HandleMQTT(ctx context.Context, _ *SubspaceRelay, pub *paho.Publish) bool {
 	if len(pub.Properties.CorrelationData) != 0 {
 		// ignore RPC replies
 		return false

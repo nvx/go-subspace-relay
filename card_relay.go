@@ -186,15 +186,6 @@ func (h *CardRelay[T]) run(ctx context.Context, state T) (err error) {
 func (h *CardRelay[T]) Exchange(ctx context.Context, capdu []byte) (rapdu []byte, err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
-	//fmt.Printf("RX: %X\n", capdu)
-	//defer func() {
-	//	if rapdu != nil {
-	//		fmt.Printf("TX: %X\n", rapdu)
-	//	} else {
-	//		fmt.Printf("Error: %v\n", err)
-	//	}
-	//}()
-
 	rapdu, err = h.tryHandleShortcut(ctx, capdu)
 	if err != nil {
 		return
@@ -247,7 +238,6 @@ func (h *CardRelay[T]) HandleMQTT(ctx context.Context, r *SubspaceRelay, p *paho
 	// rpc responses are handled by the rpc router
 	if len(p.Properties.CorrelationData) != 0 && p.Properties.ResponseTopic == "" {
 		// response to an RPC, handled by the router
-		//fmt.Println("RPC Reply")
 		return false
 	}
 

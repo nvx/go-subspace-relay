@@ -118,7 +118,7 @@ func (c *CardController) HandleMQTT(ctx context.Context, r *SubspaceRelay, p *pa
 		} else {
 			// non-shortcut packets
 			slog.DebugContext(ctx, "Non-shortcut cAPDU", rfid.LogHex("capdu", capdu))
-			err = r.HandlePayload(ctx, p.Properties, msg.Payload, func(ctx context.Context, p *subspacerelaypb.Payload) (ret []byte, err error) {
+			err = r.HandlePayload(ctx, p.Properties, msg.Payload, func(ctx context.Context, _ *subspacerelaypb.Payload) (ret []byte, err error) {
 				err = c.Resequencer(ctx, msg.Payload.Sequence, func(ctx context.Context) (err error) {
 					ret, err = c.handler.Exchange(ctx, capdu)
 					if err != nil {
