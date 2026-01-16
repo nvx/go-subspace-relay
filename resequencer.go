@@ -20,9 +20,7 @@ func NewResequencer() Resequencer {
 	cond := sync.NewCond(new(sync.Mutex))
 	var sequence uint32
 	return func(ctx context.Context, newSequence uint32, cb func(context.Context) error) (err error) {
-		stop := context.AfterFunc(ctx, func() {
-			cond.Broadcast()
-		})
+		stop := context.AfterFunc(ctx, cond.Broadcast)
 		defer stop()
 
 		cond.L.Lock()
@@ -31,6 +29,7 @@ func NewResequencer() Resequencer {
 		}
 		for newSequence != sequence {
 			if ctx.Err() != nil {
+				cond.L.Unlock()
 				return context.Cause(ctx)
 			}
 
