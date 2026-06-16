@@ -6,7 +6,6 @@ import (
 	"github.com/eclipse/paho.golang/paho"
 	"github.com/nvx/go-rfid"
 	subspacerelaypb "github.com/nvx/subspace-relay"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"log/slog"
 	"slices"
 )
@@ -33,7 +32,7 @@ func NewPCSC(ctx context.Context, brokerURL, relayID string, connTypes ...subspa
 
 	slog.InfoContext(ctx, "Requesting relay info")
 	msg, err := relay.Exchange(ctx, &subspacerelaypb.Message{
-		Message: &subspacerelaypb.Message_RequestRelayInfo{RequestRelayInfo: &emptypb.Empty{}},
+		Message: &subspacerelaypb.Message_RequestRelayInfo{RequestRelayInfo: &subspacerelaypb.RequestRelayInfo{}},
 	})
 	if err != nil {
 		_ = p.Close()
@@ -95,11 +94,13 @@ func (p *PCSC) ATR() ([]byte, error) {
 	return p.RelayInfo.Atr, nil
 }
 
-func (p *PCSC) Disconnect(ctx context.Context) error {
+func (p *PCSC) Disconnect(ctx context.Context, temporary bool) (err error) {
+	defer rfid.DeferWrap(ctx, &err)
+
 	return p.Relay.SendUnsolicited(ctx, &subspacerelaypb.Message{
-		Message: &subspacerelaypb.Message_Disconnect{
-			Disconnect: &emptypb.Empty{},
-		},
+		Message: &subspacerelaypb.Message_Disconnect{Disconnect: &subspacerelaypb.Disconnect{
+			Temporary: temporary,
+		}},
 	})
 }
 

@@ -6,7 +6,6 @@ import (
 	"github.com/eclipse/paho.golang/paho"
 	"github.com/nvx/go-rfid"
 	subspacerelaypb "github.com/nvx/subspace-relay"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"io"
 	"log/slog"
 	"slices"
@@ -52,7 +51,7 @@ func (r *SubspaceRelay) ReadWriter(ctx context.Context, payloadType subspacerela
 func (rw *readWriter) checkClient(ctx context.Context) (err error) {
 	slog.InfoContext(ctx, "Requesting relay info")
 	msg, err := rw.r.Exchange(ctx, &subspacerelaypb.Message{
-		Message: &subspacerelaypb.Message_RequestRelayInfo{RequestRelayInfo: &emptypb.Empty{}},
+		Message: &subspacerelaypb.Message_RequestRelayInfo{RequestRelayInfo: &subspacerelaypb.RequestRelayInfo{}},
 	})
 	if err != nil {
 		return

@@ -6,7 +6,6 @@ import (
 	"github.com/eclipse/paho.golang/paho"
 	"github.com/nvx/go-rfid"
 	subspacerelaypb "github.com/nvx/subspace-relay"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"log/slog"
 	"slices"
 	"sync"
@@ -25,7 +24,7 @@ type CardController struct {
 
 type CardControllerHandler interface {
 	rfid.Exchanger
-	Disconnect(context.Context)
+	Disconnect(context.Context, *subspacerelaypb.Disconnect)
 }
 
 func NewCardController(ctx context.Context, serverURL, relayID string, connTypes []subspacerelaypb.ConnectionType, handler CardControllerHandler) (_ *CardController, err error) {
@@ -50,7 +49,7 @@ func NewCardController(ctx context.Context, serverURL, relayID string, connTypes
 
 	slog.InfoContext(ctx, "Requesting relay info")
 	msg, err := relay.Exchange(ctx, &subspacerelaypb.Message{
-		Message: &subspacerelaypb.Message_RequestRelayInfo{RequestRelayInfo: &emptypb.Empty{}},
+		Message: &subspacerelaypb.Message_RequestRelayInfo{RequestRelayInfo: &subspacerelaypb.RequestRelayInfo{}},
 	})
 	if err != nil {
 		_ = c.Close()
@@ -135,7 +134,7 @@ func (c *CardController) HandleMQTT(ctx context.Context, r *SubspaceRelay, p *pa
 		slog.InfoContext(ctx, "Remote Log: "+msg.Log.Message)
 	case *subspacerelaypb.Message_Disconnect:
 		slog.InfoContext(ctx, "Remote disconnected")
-		c.handler.Disconnect(ctx)
+		c.handler.Disconnect(ctx, msg.Disconnect)
 	default:
 		return false
 	}
@@ -152,10 +151,17 @@ func (c *CardController) Reconnect(ctx context.Context, msg *subspacerelaypb.Rec
 	return c.Relay.SendUnsolicited(ctx, &subspacerelaypb.Message{Message: &subspacerelaypb.Message_Reconnect{Reconnect: msg}})
 }
 
-func (c *CardController) Disconnect(ctx context.Context) (err error) {
+// Disconnect sends a disconnect message to the relay. If the provided msg is nil an empty message is used instead.
+func (c *CardController) Disconnect(ctx context.Context, msg *subspacerelaypb.Disconnect) (err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
-	return c.Relay.SendUnsolicited(ctx, &subspacerelaypb.Message{Message: &subspacerelaypb.Message_Disconnect{Disconnect: &emptypb.Empty{}}})
+	if msg == nil {
+		msg = &subspacerelaypb.Disconnect{}
+	}
+
+	return c.Relay.SendUnsolicited(ctx, &subspacerelaypb.Message{
+		Message: &subspacerelaypb.Message_Disconnect{Disconnect: msg},
+	})
 }
 
 func (c *CardController) Close() (err error) {
@@ -164,7 +170,7 @@ func (c *CardController) Close() (err error) {
 
 func (c *CardController) close() (err error) {
 	ctx := context.Background()
-	err = c.Disconnect(ctx)
+	err = c.Disconnect(ctx, nil)
 	if err != nil {
 		c.ctxCancel()
 		_ = c.Relay.Close()
