@@ -13,6 +13,7 @@ import (
 
 const CardShortcutLimit = 50
 
+// CardController implements a Subspace Relay Controller to communicate with a remote relay exposing a PCSC-like card emulator
 type CardController struct {
 	Relay       *SubspaceRelay
 	ctxCancel   context.CancelFunc
@@ -133,7 +134,7 @@ func (c *CardController) HandleMQTT(ctx context.Context, r *SubspaceRelay, p *pa
 	case *subspacerelaypb.Message_Log:
 		slog.InfoContext(ctx, "Remote Log: "+msg.Log.Message)
 	case *subspacerelaypb.Message_Disconnect:
-		slog.InfoContext(ctx, "Remote disconnected")
+		slog.InfoContext(ctx, "Remote disconnected", slog.Bool("temporary", msg.Disconnect.Temporary))
 		c.handler.Disconnect(ctx, msg.Disconnect)
 	default:
 		return false

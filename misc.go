@@ -1,12 +1,14 @@
 package subspacerelay
 
+import (
+	"context"
+	"fmt"
+)
+
 const (
 	ContentTypeProto = "application/proto"
 )
 
-func Must[T any](val T, err error) T {
-	if err != nil {
-		panic(err)
-	}
-	return val
-}
+var (
+	ErrRemoteDisconnect = fmt.Errorf("%w: remote triggered permanent disconnect", context.Canceled)
+)

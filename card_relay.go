@@ -17,6 +17,9 @@ import (
 type CardRelay[T io.Closer] struct {
 	relay *SubspaceRelay
 
+	shutdown     chan struct{}
+	shutdownOnce sync.Once
+
 	relayInfoMutex     sync.RWMutex
 	relayInfo          *subspacerelaypb.RelayInfo
 	plaintextDiscovery bool
@@ -45,6 +48,7 @@ type CardRelayHandler[T io.Closer] interface {
 func NewCardRelay[T io.Closer](relay *SubspaceRelay, relayInfo *subspacerelaypb.RelayInfo, handler CardRelayHandler[T]) *CardRelay[T] {
 	return &CardRelay[T]{
 		relay:       relay,
+		shutdown:    make(chan struct{}),
 		relayInfo:   relayInfo,
 		handler:     handler,
 		connectChan: make(chan *subspacerelaypb.Reconnect, 1),
@@ -72,6 +76,11 @@ func (h *CardRelay[T]) Run(ctx context.Context) (err error) {
 	}
 
 	for ctx.Err() == nil {
+		select {
+		case <-h.shutdown:
+			return nil
+		default:
+		}
 		err = h.relay.SendLog(context.WithoutCancel(ctx), &subspacerelaypb.Log{
 			Message: "Waiting for signal to connect",
 		})
@@ -84,6 +93,8 @@ func (h *CardRelay[T]) Run(ctx context.Context) (err error) {
 		var msg *subspacerelaypb.Reconnect
 		select {
 		case msg = <-h.connectChan:
+		case <-h.shutdown:
+			return nil
 		case <-ctx.Done():
 			return context.Cause(ctx)
 		}
@@ -258,6 +269,10 @@ func (h *CardRelay[T]) HandleMQTT(ctx context.Context, r *SubspaceRelay, p *paho
 		}
 		h.shortcutMutex.Unlock()
 	case *subspacerelaypb.Message_Disconnect:
+		if !msg.Disconnect.Temporary {
+			slog.InfoContext(ctx, "Controller initiated shutdown")
+			h.shutdownOnce.Do(func() { close(h.shutdown) })
+		}
 		h.Disconnect()
 	case *subspacerelaypb.Message_Reconnect:
 		// cancel any existing emulation

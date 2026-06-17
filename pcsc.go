@@ -10,11 +10,14 @@ import (
 	"slices"
 )
 
-// PCSC allows communicating with a remote PCSC-like connected reader
+// PCSC implements a Subspace Relay Controller to communicate with a remote relay exposing a PCSC-like reader
 type PCSC struct {
 	Relay *SubspaceRelay
 
 	RelayInfo *subspacerelaypb.RelayInfo
+
+	ctx    context.Context
+	cancel context.CancelCauseFunc
 }
 
 func NewPCSC(ctx context.Context, brokerURL, relayID string, connTypes ...subspacerelaypb.ConnectionType) (_ *PCSC, err error) {
@@ -24,8 +27,12 @@ func NewPCSC(ctx context.Context, brokerURL, relayID string, connTypes ...subspa
 	if err != nil {
 		return
 	}
+
+	ctx, cancel := context.WithCancelCause(ctx)
 	p := &PCSC{
-		Relay: relay,
+		Relay:  relay,
+		ctx:    ctx,
+		cancel: cancel,
 	}
 
 	relay.RegisterHandler(p)
@@ -64,10 +71,14 @@ func NewPCSC(ctx context.Context, brokerURL, relayID string, connTypes ...subspa
 }
 
 func (p *PCSC) Close() (err error) {
-	return p.Relay.conn.Disconnect(context.Background())
+	p.cancel(nil)
+	return p.Relay.Close()
 }
 
 func (p *PCSC) Exchange(ctx context.Context, capdu []byte) ([]byte, error) {
+	ctx, cancel := joinContextCancellation(p.ctx, ctx)
+	defer cancel()
+
 	return p.Relay.ExchangePayloadBytes(ctx, &subspacerelaypb.Payload{
 		Payload:     capdu,
 		PayloadType: subspacerelaypb.PayloadType_PAYLOAD_TYPE_PCSC_READER,
@@ -75,6 +86,9 @@ func (p *PCSC) Exchange(ctx context.Context, capdu []byte) ([]byte, error) {
 }
 
 func (p *PCSC) Control(ctx context.Context, code uint16, data []byte) ([]byte, error) {
+	ctx, cancel := joinContextCancellation(p.ctx, ctx)
+	defer cancel()
+
 	codeUint32 := uint32(code)
 	return p.Relay.ExchangePayloadBytes(ctx, &subspacerelaypb.Payload{
 		Payload:     data,
@@ -94,19 +108,23 @@ func (p *PCSC) ATR() ([]byte, error) {
 	return p.RelayInfo.Atr, nil
 }
 
-func (p *PCSC) Disconnect(ctx context.Context, temporary bool) (err error) {
+// Disconnect sends a disconnect message to the relay. If the provided msg is nil an empty message is used instead.
+func (p *PCSC) Disconnect(ctx context.Context, msg *subspacerelaypb.Disconnect) (err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
+	if msg == nil {
+		msg = &subspacerelaypb.Disconnect{}
+	}
+
 	return p.Relay.SendUnsolicited(ctx, &subspacerelaypb.Message{
-		Message: &subspacerelaypb.Message_Disconnect{Disconnect: &subspacerelaypb.Disconnect{
-			Temporary: temporary,
-		}},
+		Message: &subspacerelaypb.Message_Disconnect{Disconnect: msg},
 	})
 }
 
-func (p *PCSC) Reconnect(_ context.Context) error {
-	// TODO: Could add this
-	return errors.New("unsupported")
+func (p *PCSC) Reconnect(ctx context.Context) error {
+	return p.Disconnect(ctx, &subspacerelaypb.Disconnect{
+		Temporary: true,
+	})
 }
 
 func (p *PCSC) HandleMQTT(ctx context.Context, _ *SubspaceRelay, pub *paho.Publish) bool {
@@ -126,7 +144,10 @@ func (p *PCSC) HandleMQTT(ctx context.Context, _ *SubspaceRelay, pub *paho.Publi
 		slog.InfoContext(ctx, "Remote Log: "+msg.Log.Message)
 		return true
 	case *subspacerelaypb.Message_Disconnect:
-		slog.InfoContext(ctx, "Remote disconnected")
+		slog.InfoContext(ctx, "Remote disconnected", slog.Bool("temporary", msg.Disconnect.Temporary))
+		if !msg.Disconnect.Temporary {
+			p.cancel(ErrRemoteDisconnect)
+		}
 		return true
 	default:
 		return false

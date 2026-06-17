@@ -15,7 +15,7 @@ import (
 type readWriter struct {
 	r           *SubspaceRelay
 	ctx         context.Context
-	cancel      context.CancelFunc
+	cancel      context.CancelCauseFunc
 	readChan    chan []byte
 	readBuf     []byte
 	payloadType subspacerelaypb.PayloadType
@@ -26,7 +26,7 @@ var (
 )
 
 func (r *SubspaceRelay) ReadWriter(ctx context.Context, payloadType subspacerelaypb.PayloadType) (_ io.ReadWriter, err error) {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancelCause(ctx)
 
 	rw := &readWriter{
 		r:           r,
@@ -76,7 +76,7 @@ func (rw *readWriter) checkClient(ctx context.Context) (err error) {
 }
 
 func (rw *readWriter) Close() error {
-	rw.cancel()
+	rw.cancel(nil)
 	return nil
 }
 
@@ -108,7 +108,10 @@ func (rw *readWriter) HandleMQTT(ctx context.Context, _ *SubspaceRelay, p *paho.
 		slog.InfoContext(ctx, "Remote Log: "+msg.Log.Message)
 		return true
 	case *subspacerelaypb.Message_Disconnect:
-		slog.InfoContext(ctx, "Remote disconnected")
+		slog.InfoContext(ctx, "Remote disconnected", slog.Bool("temporary", msg.Disconnect.Temporary))
+		if !msg.Disconnect.Temporary {
+			rw.cancel(ErrRemoteDisconnect)
+		}
 		return true
 	default:
 		return false
@@ -140,10 +143,9 @@ func (rw *readWriter) Read(p []byte) (_ int, err error) {
 		}
 
 		return n, nil
-	case <-rw.ctx.Done():
-		return 0, context.Cause(rw.ctx)
 	case <-ctx.Done():
-		return 0, nil
+		// if ctx times out but rw.ctx is still valid this returns a nil error
+		return 0, context.Cause(rw.ctx)
 	}
 }
 

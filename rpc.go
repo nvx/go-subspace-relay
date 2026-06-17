@@ -62,6 +62,11 @@ func (r *SubspaceRelay) ExchangeMulti(ctx context.Context, message *subspacerela
 func (r *SubspaceRelay) exchange(ctx context.Context, message *subspacerelaypb.Message, persistent bool) (_ <-chan *paho.Publish, _ []byte, err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
+	if ctx.Err() != nil {
+		err = ctx.Err()
+		return
+	}
+
 	messageBytes, err := proto.Marshal(message)
 	if err != nil {
 		return
