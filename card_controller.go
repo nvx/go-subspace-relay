@@ -16,7 +16,6 @@ const CardShortcutLimit = 50
 // CardController implements a Subspace Relay Controller to communicate with a remote relay exposing a PCSC-like card emulator
 type CardController struct {
 	Relay       *SubspaceRelay
-	ctxCancel   context.CancelFunc
 	RelayInfo   *subspacerelaypb.RelayInfo
 	handler     CardControllerHandler
 	Resequencer Resequencer
@@ -36,11 +35,8 @@ func NewCardController(ctx context.Context, serverURL, relayID string, connTypes
 		return
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-
 	c := &CardController{
 		Relay:       relay,
-		ctxCancel:   cancel,
 		handler:     handler,
 		Resequencer: NoopResequencer,
 	}
@@ -171,14 +167,11 @@ func (c *CardController) Close() (err error) {
 
 func (c *CardController) close() (err error) {
 	ctx := context.Background()
-	err = c.Disconnect(ctx, nil)
+	err = c.Disconnect(ctx, &subspacerelaypb.Disconnect{Temporary: true})
 	if err != nil {
-		c.ctxCancel()
 		_ = c.Relay.Close()
 		return
 	}
-
-	c.ctxCancel()
 
 	return c.Relay.Close()
 }
