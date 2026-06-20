@@ -57,7 +57,7 @@ func NewCardController(ctx context.Context, serverURL, relayID string, connTypes
 	case *subspacerelaypb.Message_RelayInfo:
 		c.RelayInfo = msg.RelayInfo
 		slog.InfoContext(ctx, "Got relay info", RelayInfoAttrs(c.RelayInfo))
-		if !slices.Contains(connTypes, c.RelayInfo.ConnectionType) ||
+		if (len(connTypes) > 0 && !slices.Contains(connTypes, c.RelayInfo.ConnectionType)) ||
 			!slices.Contains(c.RelayInfo.SupportedPayloadTypes, subspacerelaypb.PayloadType_PAYLOAD_TYPE_PCSC_CARD) {
 			err = errors.New("relay type mismatch")
 			break
