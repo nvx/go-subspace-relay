@@ -1,10 +1,9 @@
 module github.com/nvx/go-subspace-relay
 
-go 1.25.0
+go 1.27.0
 
 require (
 	github.com/eclipse/paho.golang v0.23.0
-	github.com/google/uuid v1.6.0
 	github.com/nvx/go-apdu v1.0.1
 	github.com/nvx/go-rfid v1.0.0
 	github.com/nvx/subspace-relay v1.0.12

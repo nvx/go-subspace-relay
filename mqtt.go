@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"github.com/eclipse/paho.golang/autopaho"
 	"github.com/eclipse/paho.golang/paho"
-	"github.com/google/uuid"
 	"github.com/nvx/go-rfid"
 	"log/slog"
 	"net/url"
 	"strings"
 	"sync"
+	"uuid"
 )
 
 const (
@@ -125,13 +125,7 @@ func New(ctx context.Context, brokerURL, relayID string) (_ *SubspaceRelay, err 
 		return
 	}
 
-	var newUUID uuid.UUID
-	newUUID, err = uuid.NewV7()
-	if err != nil {
-		return
-	}
-
-	uniqueID := strings.ReplaceAll(newUUID.String(), "-", "")
+	uniqueID := strings.ReplaceAll(uuid.NewV4().String(), "-", "")
 
 	var clientSuffix string
 	var isRelaySide bool
