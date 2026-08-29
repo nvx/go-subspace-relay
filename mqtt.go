@@ -2,9 +2,6 @@ package subspacerelay
 
 import (
 	"context"
-	"crypto/pbkdf2"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"github.com/eclipse/paho.golang/autopaho"
 	"github.com/eclipse/paho.golang/paho"
@@ -146,11 +143,7 @@ func New(ctx context.Context, brokerURL, relayID string) (_ *SubspaceRelay, err 
 		clientSuffix = "-controller-" + uniqueID
 	}
 
-	bID, err := pbkdf2.Key(sha256.New, relayID, []byte("mqtt-id"), 20, 16)
-	if err != nil {
-		panic(err)
-	}
-	mqttClientID := hex.EncodeToString(bID) // this encodes to lowercase
+	mqttClientID := generateMQTTClientID(relayID)
 
 	r := &SubspaceRelay{
 		isRelaySide: isRelaySide,

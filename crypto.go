@@ -7,6 +7,7 @@ import (
 	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
 )
 
 type crypto struct {
@@ -46,6 +47,14 @@ func (c crypto) encrypt(b []byte) []byte {
 	return c.aead.Seal(b[:0], nil, b, nil)
 }
 
+func generateMQTTClientID(relayID string) string {
+	bID, err := pbkdf2.Key(sha256.New, relayID, []byte("mqtt-id"), 20, 16)
+	if err != nil {
+		panic(err)
+	}
+	return hex.EncodeToString(bID) // this encodes to lowercase
+}
+
 // GenerateECDHAESGCM calculates a secret key between the provided keys and returns an AES128-GCM AEAD mode.
 // If privKey is nil a randomly generated key is used
 // The public key for our side is always returned.
@@ -62,7 +71,12 @@ func GenerateECDHAESGCM(privKey *ecdh.PrivateKey, pubKey *ecdh.PublicKey) (_ cip
 		return
 	}
 
-	block, err := aes.NewCipher(key[:16])
+	key, err = pbkdf2.Key(sha256.New, string(key), []byte("discovery"), 20, 16)
+	if err != nil {
+		return
+	}
+
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return
 	}
